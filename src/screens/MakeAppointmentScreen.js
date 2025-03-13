@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import "../components/Logo";
 import {
   AppBar,
   Toolbar,
   Typography,
-  Card,
   Grid,
   TextField,
   Button,
@@ -21,13 +21,13 @@ import {
   CircularProgress,
   Alert,
   Box,
-  Chip,
   Container,
   Divider,
   Paper,
   Stepper,
   Step,
   StepLabel,
+  Stack,
   IconButton,
 } from "@mui/material";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
@@ -40,10 +40,11 @@ import {
   Event as EventIcon,
   Phone as PhoneIcon,
 } from "@mui/icons-material";
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import axios from "axios";
 import { format, parse, isEqual, addDays } from "date-fns";
 import Cookies from "js-cookie";
-import Logo from "../components/Logo";
 import ContactBox from "../components/ContactBox";
 
 const ServerIP = process.env.REACT_APP_SERVER_IP;
@@ -302,39 +303,80 @@ const MakeAppointmentScreen = () => {
         Select an Appointment Date
       </Typography>
       
-      <Paper elevation={2} sx={{ p: 3, mb: 3, backgroundColor: "#FFFFFF" }}>
-        <DatePicker
-          label="Appointment Date"
-          value={selectedDate}
-          onChange={handleDateChange}
-          minDate={new Date()}
-          maxDate={addDays(new Date(), 30)}
-          sx={{ width: '100%', mb: 2 }}
-          format="EEEE, MMMM d, yyyy"
-        />
+      <Paper elevation={2} sx={{ p: { xs: 2, sm: 3 }, mb: 3, backgroundColor: "#FFFFFF" }}>
+  <DatePicker
+    label="Appointment Date"
+    value={selectedDate}
+    onChange={handleDateChange}
+    minDate={new Date()}
+    maxDate={addDays(new Date(), 30)}
+    shouldDisableDate={(date) => format(date, 'EEEE') === 'Friday'}
+    sx={{ width: '100%', mb: 2 }}
+    format="EEEE, MMMM d, yyyy"
+  />
+  
+  <Box 
+    sx={{ 
+      overflowX: 'auto', 
+      pb: 1, 
+      '&::-webkit-scrollbar': {
+        height: '6px',
+      },
+      '&::-webkit-scrollbar-thumb': {
+        backgroundColor: 'rgba(0,0,0,0.2)',
+        borderRadius: '10px',
+      }
+    }}
+  >
+    <Box sx={{ 
+      display: 'flex', 
+      justifyContent: 'flex-start', 
+      mt: 2,
+      minWidth: { xs: '500px', sm: 'auto' }
+    }}>
+      {(() => {
+        const buttons = [];
+        let currentDate = new Date();
+        let daysAdded = 0;
         
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
-          {[0, 1, 2, 3, 4].map((dayOffset) => {
-            const date = addDays(new Date(), dayOffset);
-            return (
+        while (buttons.length < 7) {
+          // Skip Fridays (5 is Friday in JavaScript's getDay(), where 0 is Sunday)
+          if (currentDate.getDay() !== 5) {
+            const date = new Date(currentDate);
+            buttons.push(
               <Button
-                key={dayOffset}
+                key={daysAdded}
                 variant={isEqual(date, selectedDate) ? "contained" : "outlined"}
                 onClick={() => handleDateChange(date)}
-                sx={{ 
-                  flex: 1, 
+                sx={{
+                  flex: { xs: '0 0 auto', sm: 1 },
                   mx: 0.5,
                   flexDirection: 'column',
-                  py: 1
+                  py: 1,
+                  minWidth: { xs: '64px', sm: '0' },
+                  px: { xs: 1, sm: 2 }
                 }}
               >
                 <Typography variant="caption">{format(date, 'EEE')}</Typography>
                 <Typography>{format(date, 'd')}</Typography>
               </Button>
             );
-          })}
-        </Box>
-      </Paper>
+          }
+          
+          // Move to next day
+          currentDate = addDays(currentDate, 1);
+          daysAdded++;
+        }
+        
+        return buttons;
+      })()}
+    </Box>
+  </Box>
+  
+  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, textAlign: 'center' }}>
+    * Friday appointments are not available
+  </Typography>
+</Paper>
 
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
         <Button 
@@ -605,80 +647,65 @@ const MakeAppointmentScreen = () => {
 
   // Dialog for selecting patient type with improved UI
   const renderPatientTypeDialog = () => (
-    <Dialog 
-      open={showPatientTypeDialog} 
+    <Dialog
+      open={showPatientTypeDialog}
       onClose={() => setShowPatientTypeDialog(false)}
       fullWidth
       maxWidth="sm"
     >
-      <DialogTitle sx={{ textAlign: 'center', pb: 0 }}>Welcome</DialogTitle>
-      
-      <DialogContent>
-        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
-          <Logo />
-        </Box>
-        
-        <Typography variant="body1" align="center" color="text.secondary" sx={{ mb: 3 }}>
+      <DialogTitle sx={{ textAlign: 'center', pb: 1 }}>Welcome</DialogTitle>
+      <DialogContent sx={{ pb: 2 }}>
+        <Typography variant="body1" sx={{ textAlign: 'center', mb: 2 }}>
           Please select an option to continue
         </Typography>
         
-        <Grid container spacing={2}>
-          <Grid item xs={12}>
-            <Button
-              variant="contained"
-              fullWidth
-              size="large"
-              onClick={() => {
-                setIsExisting(false);
-                setShowPatientTypeDialog(false);
-                setPhoneNumber("");
-              }}
-              sx={{ 
-                py: 2, 
-                backgroundColor: '#011627',
-                '&:hover': { backgroundColor: '#01253e' }
-              }}
-              startIcon={<PersonIcon />}
-            >
-              New Patient
-            </Button>
-          </Grid>
+        <Stack spacing={2}>
+          <Button
+            fullWidth
+            variant="contained"
+            onClick={() => {
+              setIsExisting(false);
+              setShowPatientTypeDialog(false);
+              setPhoneNumber("");
+            }}
+            sx={{
+              py: 1.5,
+              backgroundColor: '#011627',
+              '&:hover': { backgroundColor: '#01253e' }
+            }}
+            startIcon={<PersonAddIcon />}
+          >
+            New Patient
+          </Button>
           
-          <Grid item xs={12}>
-            <Button
-              variant="outlined"
-              fullWidth
-              size="large"
-              onClick={() => {
-                const savedPhoneNumber = Cookies.get("phone_number");
-                if (savedPhoneNumber) {
-                  setPhoneNumber(savedPhoneNumber);
-                }
-                setIsExisting(true);
-                setShowPatientTypeDialog(false);
-              }}
-              sx={{ py: 2 }}
-              startIcon={<PersonIcon />}
-            >
-              Existing Patient
-            </Button>
-          </Grid>
+          <Button
+            fullWidth
+            variant="outlined"
+            onClick={() => {
+              const savedPhoneNumber = Cookies.get("phone_number");
+              if (savedPhoneNumber) {
+                setPhoneNumber(savedPhoneNumber);
+              }
+              setIsExisting(true);
+              setShowPatientTypeDialog(false);
+            }}
+            startIcon={<PersonIcon />}
+          >
+            Existing Patient
+          </Button>
           
-          <Grid item xs={12}>
-            <Button
-              variant="text"
-              fullWidth
-              onClick={() => {
-                setShowPatientTypeDialog(false);
-                setShowPhoneNumberDialog(true);
-              }}
-              sx={{ py: 1.5 }}
-              startIcon={<AccessTimeIcon />}
-            >
-              View My Appointments
-            </Button>
-          </Grid>
-        </Grid>
+          <Button
+            fullWidth
+            variant="text"
+            onClick={() => {
+              setShowPatientTypeDialog(false);
+              setShowPhoneNumberDialog(true);
+            }}
+            startIcon={<CalendarTodayIcon />}
+          >
+            View My Appointments
+          </Button>
+        </Stack>
       </DialogContent>
     </Dialog>
   );
@@ -780,7 +807,6 @@ const MakeAppointmentScreen = () => {
       {/* Main Container */}
       <Container maxWidth="md" sx={{ my: 2 }}>
         {/* Show logo only on initial screen */}
-        {showPatientTypeDialog && <Box sx={{ display: 'flex', justifyContent: 'center', my: 3 }}><Logo /></Box>}
         
         {/* Error message if present */}
         {error && !showPhoneNumberDialog && !showPatientTypeDialog && (

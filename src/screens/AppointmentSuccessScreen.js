@@ -1,10 +1,7 @@
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
-  AppBar,
-  Toolbar,
   Typography,
-  Card,
   Grid,
   Button,
   Box,
@@ -12,13 +9,11 @@ import {
   Paper,
   Container,
   Chip,
-  Avatar
 } from "@mui/material";
 import Lottie from "lottie-react";
 import successAnimation from "../assets/success-animation.json";
 import Cookies from "js-cookie";
 import ContactBox from "../components/ContactBox";
-import Logo from "../components/Logo";
 import EventIcon from '@mui/icons-material/Event';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import PersonIcon from '@mui/icons-material/Person';
