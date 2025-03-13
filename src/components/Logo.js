@@ -7,7 +7,7 @@ const Logo = () => {
     <img
       src={logo} // Replace with the path to your logo
       alt="Logo"
-      style={{ width: "150px", height: "150px" }}
+      style={{ width: "300px", height: "auto" }}
     />
   </Box>
   );

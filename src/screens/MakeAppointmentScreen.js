@@ -76,6 +76,43 @@ const MakeAppointmentScreen = () => {
   // Steps for the appointment booking process
   const steps = ['Select Date', 'Choose Time', 'Your Details'];
 
+  // Replace the useEffect where you generate time blocks with this updated version
+useEffect(() => {
+  // First, check if we need to initialize the date
+  if (selectedDate === null || (selectedDate.getDay() === 5 && !fromAppointments)) {
+    const startDate = new Date();
+    let availableDate = new Date(startDate);
+    
+    // If today is Friday (5), move to Saturday
+    if (startDate.getDay() === 5) {
+      availableDate.setDate(startDate.getDate() + 1);
+    }
+    
+    setSelectedDate(availableDate);
+  } else if (therapists.length > 0) {
+    // This is the existing generateTimeBlocks effect
+    generateTimeBlocks();
+  }
+}, [selectedDate, therapists, fromAppointments]);
+
+// Add this new useEffect to handle initial date selection
+useEffect(() => {
+  const initializeDate = () => {
+    const startDate = new Date();
+    let availableDate = new Date(startDate);
+    
+    // If today is Friday (5), move to Saturday
+    if (startDate.getDay() === 5) {
+      availableDate.setDate(startDate.getDate() + 1);
+    }
+    
+    setSelectedDate(availableDate);
+  };
+  
+  // Initialize the date when the component mounts
+  initializeDate();
+}, []);
+
   useEffect(() => {
     const patientId = Cookies.get("patient_id");
     if (fromAppointments) {

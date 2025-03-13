@@ -80,14 +80,19 @@ const AppointmentsScreen = () => {
 
   const formatAppointmentDate = (dateTimeString) => {
     const date = new Date(dateTimeString);
-    return date.toLocaleString('en-US', { 
-      weekday: 'short',
-      day: 'numeric', 
-      month: 'short', 
-      year: 'numeric',
-      hour: '2-digit', 
-      minute: '2-digit'
-    });
+    
+    // Format the date as yyyy/mm/dd
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    
+    // Format the time as h:mm a (12-hour format with AM/PM)
+    const hours = date.getHours();
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const hour12 = hours % 12 || 12; // Convert 0 to 12 for 12 AM
+    
+    return `${year}/${month}/${day} & ${hour12}:${minutes} ${ampm}`;
   };
 
   const AppointmentCard = ({ appointment, isRequest }) => {
@@ -193,7 +198,7 @@ const AppointmentsScreen = () => {
           >
             <ArrowBackIcon />
           </IconButton>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1 , textAlign: "center"}}>
             Your Appointments
           </Typography>
         </Toolbar>
