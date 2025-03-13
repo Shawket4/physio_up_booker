@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box } from '@mui/material';
-import logo from "../assets/logo.png";
+import logo from "../assets/Icon.png";
 const ContactBox = () => {
   return (
     <Box sx={{ display: "flex", justifyContent: "center", padding: 2 }}>

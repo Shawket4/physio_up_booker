@@ -11,23 +11,40 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
+  DialogActions,
   List,
   ListItem,
   ListItemText,
+  ListItemAvatar,
+  Avatar,
   Snackbar,
   CircularProgress,
   Alert,
   Box,
+  Chip,
+  Container,
+  Divider,
+  Paper,
+  Stepper,
+  Step,
+  StepLabel,
+  IconButton,
 } from "@mui/material";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
+import { 
+  ArrowBack as ArrowBackIcon,
+  AccessTime as AccessTimeIcon,
+  Person as PersonIcon,
+  Event as EventIcon,
+  Phone as PhoneIcon,
+} from "@mui/icons-material";
 import axios from "axios";
-import { format, parse, isEqual } from "date-fns";
+import { format, parse, isEqual, addDays } from "date-fns";
 import Cookies from "js-cookie";
 import Logo from "../components/Logo";
 import ContactBox from "../components/ContactBox";
-
 
 const ServerIP = process.env.REACT_APP_SERVER_IP;
 
@@ -36,6 +53,7 @@ const MakeAppointmentScreen = () => {
   const location = useLocation();
   const fromAppointments = location.state?.fromAppointments;
 
+  // State variables
   const [timeBlocks, setTimeBlocks] = useState([]);
   const [selectedTimeBlock, setSelectedTimeBlock] = useState(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -51,6 +69,11 @@ const MakeAppointmentScreen = () => {
   const [availableTherapists, setAvailableTherapists] = useState([]);
   const [showPhoneNumberDialog, setShowPhoneNumberDialog] = useState(false);
   const [tempPhoneNumber, setTempPhoneNumber] = useState("");
+  const [activeStep, setActiveStep] = useState(0);
+  const [success, setSuccess] = useState(false);
+
+  // Steps for the appointment booking process
+  const steps = ['Select Date', 'Choose Time', 'Your Details'];
 
   useEffect(() => {
     const patientId = Cookies.get("patient_id");
@@ -89,6 +112,7 @@ const MakeAppointmentScreen = () => {
 
   const generateTimeBlocks = () => {
     const blocks = [];
+    // Group time blocks into morning, afternoon, and evening
     for (let hour = 11; hour <= 23; hour++) {
       for (let minute = 0; minute < 60; minute += 60) {
         const blockDateTime = new Date(
@@ -114,10 +138,15 @@ const MakeAppointmentScreen = () => {
           return !isBooked;
         });
 
+        const timeCategory = 
+          hour < 12 ? "Morning" :
+          hour < 17 ? "Afternoon" : "Evening";
+
         blocks.push({
           dateTime: blockDateTime,
           isAvailable: availableTherapistsForBlock.length > 0,
-          availableTherapists: availableTherapistsForBlock
+          availableTherapists: availableTherapistsForBlock,
+          timeCategory
         });
       }
     }
@@ -127,6 +156,8 @@ const MakeAppointmentScreen = () => {
 
   const handleDateChange = (date) => {
     setSelectedDate(date);
+    setSelectedTimeBlock(null);
+    setSelectedTherapist(null);
   };
 
   const handleTimeBlockClick = (block) => {
@@ -134,6 +165,8 @@ const MakeAppointmentScreen = () => {
       return;
     }
     setSelectedTimeBlock(block);
+    
+    // Always show therapist selection dialog, even if only one is available
     setAvailableTherapists(block.availableTherapists);
     setShowTherapistDialog(true);
   };
@@ -141,6 +174,7 @@ const MakeAppointmentScreen = () => {
   const handleTherapistSelect = (therapist) => {
     setSelectedTherapist(therapist);
     setShowTherapistDialog(false);
+    handleNextStep();
   };
 
   const handleBookAppointment = async () => {
@@ -174,16 +208,25 @@ const MakeAppointmentScreen = () => {
       });
 
       if (response.data.message === "Requested Successfully") {
-        navigate('/appointment-success', {
-          state: {
-            appointmentData: {
-              date: format(finalDateTime, "EEEE, MMMM d, yyyy"),
-              time: format(finalDateTime, "h:mm a"),
-              therapistName: selectedTherapist.name,
-              patientName: isExisting ? phoneNumber : name,
+        setSuccess(true);
+        // Store phone number in cookie for returning users
+        if (!isExisting) {
+          Cookies.set("phone_number", phoneNumber, { expires: 90 });
+        }
+        
+        // Short delay to show success state
+        setTimeout(() => {
+          navigate('/appointment-success', {
+            state: {
+              appointmentData: {
+                date: format(finalDateTime, "EEEE, MMMM d, yyyy"),
+                time: format(finalDateTime, "h:mm a"),
+                therapistName: selectedTherapist.name,
+                patientName: isExisting ? phoneNumber : name,
+              }
             }
-          }
-        });
+          });
+        }, 1500);
       }
     } catch (error) {
       console.error("Error booking appointment:", error);
@@ -236,235 +279,546 @@ const MakeAppointmentScreen = () => {
     }
   };
 
+  const handleNextStep = () => {
+    setActiveStep(prevStep => Math.min(prevStep + 1, steps.length - 1));
+  };
+
+  const handleBackStep = () => {
+    setActiveStep(prevStep => Math.max(prevStep - 1, 0));
+  };
+
+  // Group time blocks by category
+  const groupedTimeBlocks = timeBlocks.reduce((acc, block) => {
+    if (!acc[block.timeCategory]) {
+      acc[block.timeCategory] = [];
+    }
+    acc[block.timeCategory].push(block);
+    return acc;
+  }, {});
+
+  const renderDateSelector = () => (
+    <Box sx={{ p: 2 }}>
+      <Typography variant="h6" gutterBottom>
+        Select an Appointment Date
+      </Typography>
+      
+      <Paper elevation={2} sx={{ p: 3, mb: 3, backgroundColor: "#FFFFFF" }}>
+        <DatePicker
+          label="Appointment Date"
+          value={selectedDate}
+          onChange={handleDateChange}
+          minDate={new Date()}
+          maxDate={addDays(new Date(), 30)}
+          sx={{ width: '100%', mb: 2 }}
+          format="EEEE, MMMM d, yyyy"
+        />
+        
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
+          {[0, 1, 2, 3, 4].map((dayOffset) => {
+            const date = addDays(new Date(), dayOffset);
+            return (
+              <Button
+                key={dayOffset}
+                variant={isEqual(date, selectedDate) ? "contained" : "outlined"}
+                onClick={() => handleDateChange(date)}
+                sx={{ 
+                  flex: 1, 
+                  mx: 0.5,
+                  flexDirection: 'column',
+                  py: 1
+                }}
+              >
+                <Typography variant="caption">{format(date, 'EEE')}</Typography>
+                <Typography>{format(date, 'd')}</Typography>
+              </Button>
+            );
+          })}
+        </Box>
+      </Paper>
+
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+        <Button 
+          variant="contained" 
+          color="primary" 
+          onClick={handleNextStep}
+          disabled={!selectedDate}
+        >
+          Continue
+        </Button>
+      </Box>
+    </Box>
+  );
+
+  const renderTimeSelector = () => (
+    <Box sx={{ p: 2 }}>
+      <Typography variant="h6" gutterBottom>
+        <EventIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+        {format(selectedDate, "EEEE, MMMM d, yyyy")}
+      </Typography>
+      
+      <Paper elevation={2} sx={{ p: 3, backgroundColor: "#FFFFFF" }}>
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <Box>
+            {Object.keys(groupedTimeBlocks).map((category) => (
+              <Box key={category} sx={{ mb: 3 }}>
+                <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1 }}>
+                  <AccessTimeIcon sx={{ mr: 1, verticalAlign: 'middle', fontSize: 'small' }} />
+                  {category}
+                </Typography>
+                
+                <Grid container spacing={1.5}>
+                  {groupedTimeBlocks[category].map((block, index) => (
+                    <Grid item xs={4} sm={3} key={index}>
+                      <Button
+                        fullWidth
+                        variant={selectedTimeBlock?.dateTime && isEqual(selectedTimeBlock.dateTime, block.dateTime) 
+                          ? "contained" 
+                          : "outlined"}
+                        color={selectedTimeBlock?.dateTime && isEqual(selectedTimeBlock.dateTime, block.dateTime) 
+                          ? "primary" 
+                          : "inherit"}
+                        onClick={() => handleTimeBlockClick(block)}
+                        disabled={!block.isAvailable}
+                        sx={{
+                          py: 1,
+                          backgroundColor: selectedTimeBlock?.dateTime && isEqual(selectedTimeBlock.dateTime, block.dateTime)
+                            ? "#011627"
+                            : block.isAvailable
+                              ? "#FFFFFF"
+                              : "#F5F5F5",
+                          '&:hover': {
+                            backgroundColor: block.isAvailable && !isEqual(selectedTimeBlock?.dateTime, block.dateTime)
+                              ? "#E3F2FD"
+                              : undefined
+                          },
+                          borderColor: block.isAvailable ? "#011627" : "#E0E0E0"
+                        }}
+                      >
+                        <Box>
+                          <Typography variant="body2">
+                            {format(block.dateTime, "h:mm a")}
+                          </Typography>
+                          <Typography variant="caption" display="block" color="text.secondary">
+                            {block.isAvailable
+                              ? `${block.availableTherapists.length} available`
+                              : "Unavailable"}
+                          </Typography>
+                        </Box>
+                      </Button>
+                    </Grid>
+                  ))}
+                </Grid>
+              </Box>
+            ))}
+          </Box>
+        )}
+      </Paper>
+
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
+        <Button onClick={handleBackStep} startIcon={<ArrowBackIcon />}>
+          Back
+        </Button>
+        <Button 
+          variant="contained" 
+          disabled={!selectedTimeBlock || !selectedTherapist}
+          onClick={handleNextStep}
+        >
+          Continue
+        </Button>
+      </Box>
+    </Box>
+  );
+
+  const renderDetailsForm = () => (
+    <Box sx={{ p: 2 }}>
+      <Typography variant="h6" gutterBottom>
+        Confirm Your Details
+      </Typography>
+      
+      <Paper elevation={2} sx={{ p: 3, backgroundColor: "#FFFFFF" }}>
+        {/* Appointment Summary */}
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+            Appointment Summary
+          </Typography>
+          
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+            <EventIcon sx={{ mr: 2, color: 'primary.main' }} />
+            <Typography>
+              {format(selectedDate, "EEEE, MMMM d, yyyy")}
+            </Typography>
+          </Box>
+          
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+            <AccessTimeIcon sx={{ mr: 2, color: 'primary.main' }} />
+            <Typography>
+              {selectedTimeBlock && format(selectedTimeBlock.dateTime, "h:mm a")}
+            </Typography>
+          </Box>
+          
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <PersonIcon sx={{ mr: 2, color: 'primary.main' }} />
+            <Typography>
+              {selectedTherapist && selectedTherapist.name}
+            </Typography>
+          </Box>
+        </Box>
+        
+        <Divider sx={{ my: 2 }} />
+        
+        {/* Patient Details Form */}
+        <Box sx={{ mt: 3 }}>
+          <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+            Your Information
+          </Typography>
+          
+          {/* Show only phone number for existing patients */}
+          {isExisting ? (
+            <TextField
+              fullWidth
+              label="Phone Number"
+              variant="outlined"
+              InputProps={{
+                startAdornment: <PhoneIcon sx={{ mr: 1, color: 'text.secondary' }} />,
+              }}
+              value={phoneNumber}
+              onChange={(e) => setPhoneNumber(e.target.value)}
+              placeholder="Enter your registered phone number"
+              sx={{ mb: 2 }}
+            />
+          ) : (
+            <>
+              <TextField
+                fullWidth
+                label="Full Name"
+                variant="outlined"
+                InputProps={{
+                  startAdornment: <PersonIcon sx={{ mr: 1, color: 'text.secondary' }} />,
+                }}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Enter your full name"
+                sx={{ mb: 2 }}
+              />
+              <TextField
+                fullWidth
+                label="Phone Number"
+                variant="outlined"
+                InputProps={{
+                  startAdornment: <PhoneIcon sx={{ mr: 1, color: 'text.secondary' }} />,
+                }}
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                placeholder="Enter your phone number"
+                sx={{ mb: 2 }}
+              />
+            </>
+          )}
+        </Box>
+      </Paper>
+      
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
+        <Button onClick={handleBackStep} startIcon={<ArrowBackIcon />}>
+          Back
+        </Button>
+        <Button
+          variant="contained"
+          onClick={handleBookAppointment}
+          disabled={loading || !isFormValid() || success}
+          sx={{ minWidth: 150 }}
+        >
+          {loading ? (
+            <CircularProgress size={24} sx={{ color: 'white' }} />
+          ) : success ? (
+            "Booked!"
+          ) : (
+            "Book Appointment"
+          )}
+        </Button>
+      </Box>
+    </Box>
+  );
+
+  // Dialog for selecting therapist with improved UI
+  const renderTherapistDialog = () => (
+    <Dialog 
+      open={showTherapistDialog} 
+      onClose={() => setShowTherapistDialog(false)}
+      fullWidth
+      maxWidth="sm"
+    >
+      <DialogTitle>
+        <Typography variant="h6">Select Your Therapist</Typography>
+        <Typography variant="body2" color="text.secondary">
+        {selectedTimeBlock && format(new Date(selectedTimeBlock.dateTime), "EEEE, MMMM d, yyyy 'at' h:mm a")}
+        </Typography>
+      </DialogTitle>
+      
+      <DialogContent>
+        <List sx={{ pt: 1 }}>
+          {availableTherapists.length > 0 ? (
+            availableTherapists.map((therapist) => (
+              <Paper 
+                key={therapist.ID}
+                elevation={1} 
+                sx={{ 
+                  mb: 2, 
+                  '&:hover': { 
+                    backgroundColor: '#F5F9FF',
+                    cursor: 'pointer'
+                  },
+                  borderRadius: 2
+                }}
+                onClick={() => handleTherapistSelect(therapist)}
+              >
+                <ListItem>
+                  <ListItemAvatar>
+                    <Avatar sx={{ bgcolor: '#011627' }}>
+                    {therapist.name.split(' ')[0].charAt(0).toUpperCase()}
+                    </Avatar>
+                  </ListItemAvatar>
+                  <ListItemText 
+                    primary={
+                      <Typography variant="subtitle1" fontWeight="medium">
+                        {therapist.name}
+                      </Typography>
+                    }
+                  />
+                </ListItem>
+              </Paper>
+            ))
+          ) : (
+            <Typography>No available therapists for this time slot.</Typography>
+          )}
+        </List>
+      </DialogContent>
+      
+      <DialogActions>
+        <Button onClick={() => setShowTherapistDialog(false)}>Cancel</Button>
+      </DialogActions>
+    </Dialog>
+  );
+
+  // Dialog for selecting patient type with improved UI
+  const renderPatientTypeDialog = () => (
+    <Dialog 
+      open={showPatientTypeDialog} 
+      onClose={() => setShowPatientTypeDialog(false)}
+      fullWidth
+      maxWidth="sm"
+    >
+      <DialogTitle sx={{ textAlign: 'center', pb: 0 }}>Welcome</DialogTitle>
+      
+      <DialogContent>
+        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
+          <Logo />
+        </Box>
+        
+        <Typography variant="body1" align="center" color="text.secondary" sx={{ mb: 3 }}>
+          Please select an option to continue
+        </Typography>
+        
+        <Grid container spacing={2}>
+          <Grid item xs={12}>
+            <Button
+              variant="contained"
+              fullWidth
+              size="large"
+              onClick={() => {
+                setIsExisting(false);
+                setShowPatientTypeDialog(false);
+                setPhoneNumber("");
+              }}
+              sx={{ 
+                py: 2, 
+                backgroundColor: '#011627',
+                '&:hover': { backgroundColor: '#01253e' }
+              }}
+              startIcon={<PersonIcon />}
+            >
+              New Patient
+            </Button>
+          </Grid>
+          
+          <Grid item xs={12}>
+            <Button
+              variant="outlined"
+              fullWidth
+              size="large"
+              onClick={() => {
+                const savedPhoneNumber = Cookies.get("phone_number");
+                if (savedPhoneNumber) {
+                  setPhoneNumber(savedPhoneNumber);
+                }
+                setIsExisting(true);
+                setShowPatientTypeDialog(false);
+              }}
+              sx={{ py: 2 }}
+              startIcon={<PersonIcon />}
+            >
+              Existing Patient
+            </Button>
+          </Grid>
+          
+          <Grid item xs={12}>
+            <Button
+              variant="text"
+              fullWidth
+              onClick={() => {
+                setShowPatientTypeDialog(false);
+                setShowPhoneNumberDialog(true);
+              }}
+              sx={{ py: 1.5 }}
+              startIcon={<AccessTimeIcon />}
+            >
+              View My Appointments
+            </Button>
+          </Grid>
+        </Grid>
+      </DialogContent>
+    </Dialog>
+  );
+
+  // Dialog for entering phone number to view appointments with improved UI
+  const renderPhoneNumberDialog = () => (
+    <Dialog 
+      open={showPhoneNumberDialog} 
+      onClose={() => setShowPhoneNumberDialog(false)}
+      fullWidth
+      maxWidth="sm"
+    >
+      <DialogTitle>View Your Appointments</DialogTitle>
+      
+      <DialogContent>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+          Please enter your phone number to view your scheduled appointments
+        </Typography>
+        
+        <TextField
+          fullWidth
+          label="Phone Number"
+          variant="outlined"
+          value={tempPhoneNumber}
+          onChange={(e) => setTempPhoneNumber(e.target.value)}
+          sx={{ mb: 3 }}
+          InputProps={{
+            startAdornment: <PhoneIcon sx={{ mr: 1, color: 'text.secondary' }} />,
+          }}
+          placeholder="Enter your registered phone number"
+        />
+        
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        )}
+        
+        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+          <Button 
+            variant="text" 
+            onClick={() => {
+              setShowPhoneNumberDialog(false);
+              setShowPatientTypeDialog(true);
+            }}
+          >
+            Back
+          </Button>
+          
+          <Button
+            variant="contained"
+            onClick={handleViewAppointments}
+            disabled={loading || !tempPhoneNumber.trim()}
+            sx={{ minWidth: 150 }}
+          >
+            {loading ? <CircularProgress size={24} /> : "View Appointments"}
+          </Button>
+        </Box>
+      </DialogContent>
+    </Dialog>
+  );
+
+  // Main render method
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
-      {/* Logo at the top */}
+      {/* App Bar with improved UI */}
       <AppBar position="static" sx={{ backgroundColor: "#011627" }}>
         <Toolbar>
+          {activeStep > 0 && (
+            <IconButton 
+              edge="start" 
+              color="inherit" 
+              onClick={handleBackStep}
+              sx={{ mr: 2 }}
+            >
+              <ArrowBackIcon />
+            </IconButton>
+          )}
+          
           <Typography variant="h6" sx={{ flexGrow: 1, textAlign: "center" }}>
             Request Appointment
           </Typography>
         </Toolbar>
       </AppBar>
-      <Logo/>
-      {/* Dialog for selecting new/existing patient or viewing appointments */}
-      <Dialog open={showPatientTypeDialog} onClose={() => setShowPatientTypeDialog(false)}>
-        <DialogTitle>Select An Option</DialogTitle>
-        <DialogContent>
-          <Button
-            variant="contained"
-            fullWidth
-            onClick={() => {
-              setIsExisting(false);
-              setShowPatientTypeDialog(false);
-              setPhoneNumber("");
-            }}
-            sx={{ marginBottom: 2 }}
-          >
-            New Patient
-          </Button>
-          <Button
-            variant="contained"
-            fullWidth
-            onClick={() => {
-              const phoneNumber = Cookies.get("phone_number");
-              if (phoneNumber) {
-                setPhoneNumber(phoneNumber);
-              }
-              setIsExisting(true);
-              setShowPatientTypeDialog(false);
-            }}
-            sx={{ marginBottom: 2 }}
-          >
-            Existing Patient
-          </Button>
-          <Button
-            variant="contained"
-            fullWidth
-            onClick={() => {
-              setShowPatientTypeDialog(false);
-              setShowPhoneNumberDialog(true);
-            }}
-          >
-            View Appointments
-          </Button>
-        </DialogContent>
-      </Dialog>
-
-      {/* Dialog for entering phone number to view appointments */}
-      <Dialog open={showPhoneNumberDialog} onClose={() => setShowPhoneNumberDialog(false)}>
-        <DialogTitle>Enter Your Phone Number</DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth
-            label="Phone Number"
-            value={tempPhoneNumber}
-            onChange={(e) => setTempPhoneNumber(e.target.value)}
-            sx={{ marginBottom: 2 }}
-          />
-          <Button
-            variant="contained"
-            fullWidth
-            onClick={handleViewAppointments}
-            disabled={loading}
-          >
-            {loading ? <CircularProgress size={24} /> : "View Appointments"}
-          </Button>
-        </DialogContent>
-      </Dialog>
-
-      {/* Dialog for selecting therapist */}
-      <Dialog open={showTherapistDialog} onClose={() => setShowTherapistDialog(false)}>
-        <DialogTitle>Select Therapist</DialogTitle>
-        <DialogContent>
-          <List>
-            {availableTherapists.length > 0 ? (
-              availableTherapists.map((therapist) => (
-                <ListItem
-                  key={therapist.ID}
-                  button
-                  onClick={() => handleTherapistSelect(therapist)}
-                >
-                  <ListItemText primary={therapist.name} />
-                </ListItem>
-              ))
-            ) : (
-              <Typography>No available therapists for this time slot.</Typography>
-            )}
-          </List>
-        </DialogContent>
-      </Dialog>
-
-      {/* Main form for booking appointments */}
+      
+      {/* Stepper for showing progress */}
       {!showPatientTypeDialog && !showPhoneNumberDialog && (
-        <Card sx={{ margin: 2, padding: 2, backgroundColor: "#F1F3FF" }}>
-          {error && (
-            <Alert severity="error" sx={{ marginBottom: 2 }} onClose={() => setError(null)}>
-              {error}
-            </Alert>
-          )}
-
-          <Grid container spacing={2}>
-            <Grid item xs={12}>
-              <DatePicker
-                label="Select Date"
-                value={selectedDate}
-                onChange={handleDateChange}
-                minDate={new Date()}
-                maxDate={new Date(new Date().setDate(new Date().getDate() + 7))}
-                sx={{ width: '100%' }}
-                format="dd/MM/yyyy"
-              />
-            </Grid>
-
-            <Grid item xs={12}>
-              {selectedTherapist ? (
-                <Typography variant="subtitle1">
-                  Selected Therapist: <strong>{selectedTherapist.name}</strong>
-                </Typography>
-              ) : (
-                <Typography variant="subtitle1" color="text.secondary">
-                  Please select a time slot and therapist
-                </Typography>
-              )}
-            </Grid>
-
-            <Grid item xs={12}>
-              <Typography variant="subtitle1" gutterBottom>
-                Available Time Slots:
-              </Typography>
-              {loading ? (
-                <Grid container justifyContent="center" sx={{ padding: 3 }}>
-                  <CircularProgress />
-                </Grid>
-              ) : (
-                <Grid container spacing={2}>
-                  {timeBlocks.map((block, index) => (
-                    <Grid item key={index} xs={4}>
-                      <Card
-                        sx={{
-                          backgroundColor:
-                            selectedTimeBlock?.dateTime && isEqual(selectedTimeBlock.dateTime, block.dateTime)
-                              ? "#011627"
-                              : block.isAvailable
-                                ? "#FEFEFE"
-                                : "#E0E0E0",
-                          color:
-                            selectedTimeBlock?.dateTime && isEqual(selectedTimeBlock.dateTime, block.dateTime)
-                              ? "#FFF"
-                              : block.isAvailable
-                                ? "#000"
-                                : "#9E9E9E",
-                          textAlign: "center",
-                          padding: 2,
-                          cursor: block.isAvailable ? "pointer" : "not-allowed",
-                          opacity: block.isAvailable ? 1 : 0.6,
-                        }}
-                        onClick={() => handleTimeBlockClick(block)}
-                      >
-                        {format(block.dateTime, "h:mm a")}
-                        <Typography variant="caption" display="block">
-                          {block.isAvailable
-                            ? `${block.availableTherapists.length} available`
-                            : "Not available"}
-                        </Typography>
-                      </Card>
-                    </Grid>
-                  ))}
-                </Grid>
-              )}
-            </Grid>
-
-            {/* Show only phone number for existing patients */}
-            {isExisting && (
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Phone Number"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                />
-              </Grid>
-            )}
-
-            {/* Show name and phone number for new patients */}
-            {isExisting === false && (
-              <>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Phone Number"
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
-                  />
-                </Grid>
-              </>
-            )}
-
-            <Grid item xs={12}>
-              <Button
-                variant="contained"
-                fullWidth
-                onClick={handleBookAppointment}
-                disabled={loading || !isFormValid()}
-              >
-                {loading ? <CircularProgress size={24} /> : "Book Appointment"}
-              </Button>
-            </Grid>
-          </Grid>
-        </Card>
+        <Box sx={{ width: '100%', bgcolor: '#F8FAFC' }}>
+          <Stepper activeStep={activeStep} sx={{ pt: 3, pb: 2, px: 2 }}>
+            {steps.map((label) => (
+              <Step key={label}>
+                <StepLabel>{label}</StepLabel>
+              </Step>
+            ))}
+          </Stepper>
+        </Box>
       )}
-
+      
+      {/* Main Container */}
+      <Container maxWidth="md" sx={{ my: 2 }}>
+        {/* Show logo only on initial screen */}
+        {showPatientTypeDialog && <Box sx={{ display: 'flex', justifyContent: 'center', my: 3 }}><Logo /></Box>}
+        
+        {/* Error message if present */}
+        {error && !showPhoneNumberDialog && !showPatientTypeDialog && (
+          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        )}
+        
+        {/* Main content based on active step */}
+        {!showPatientTypeDialog && !showPhoneNumberDialog && (
+          <Box>
+            {activeStep === 0 && renderDateSelector()}
+            {activeStep === 1 && renderTimeSelector()}
+            {activeStep === 2 && renderDetailsForm()}
+          </Box>
+        )}
+      </Container>
+      
+      {/* Render all dialogs */}
+      {renderPatientTypeDialog()}
+      {renderPhoneNumberDialog()}
+      {renderTherapistDialog()}
+      
+      {/* Success message */}
+      <Snackbar 
+        open={success} 
+        autoHideDuration={3000}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity="success" sx={{ width: '100%' }}>
+          Appointment booked successfully!
+        </Alert>
+      </Snackbar>
+      
       {/* Contact info at the bottom */}
-      <ContactBox/>
+      <Box sx={{ mt: 4 }}>
+        <ContactBox />
+      </Box>
     </LocalizationProvider>
   );
 };
