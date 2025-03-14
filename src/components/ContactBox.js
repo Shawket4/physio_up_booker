@@ -171,7 +171,7 @@ const ContactBox = () => {
   );
 
   return (
-    <Container maxWidth="sm" disableGutters sx={{ my: 3 }}>
+    <Container maxWidth="md" disableGutters sx={{ my: 2 }}>
       <Paper elevation={isMobile ? 1 : 3} sx={{ 
         padding: { xs: 2.5, sm: 3 }, 
         backgroundColor: "#F9FAFF", 

@@ -77,23 +77,23 @@ const MakeAppointmentScreen = () => {
   const steps = ['Select Date', 'Choose Time', 'Your Details'];
 
   // Replace the useEffect where you generate time blocks with this updated version
-useEffect(() => {
-  // First, check if we need to initialize the date
-  if (selectedDate === null || (selectedDate.getDay() === 5 && !fromAppointments)) {
-    const startDate = new Date();
-    let availableDate = new Date(startDate);
-    
-    // If today is Friday (5), move to Saturday
-    if (startDate.getDay() === 5) {
-      availableDate.setDate(startDate.getDate() + 1);
+  useEffect(() => {
+    // First, check if we need to initialize the date
+    if (selectedDate === null || (selectedDate.getDay() === 5 && !fromAppointments)) {
+      const startDate = new Date();
+      let availableDate = new Date(startDate);
+      
+      // If today is Friday (5), move to Saturday
+      if (startDate.getDay() === 5) {
+        availableDate.setDate(startDate.getDate() + 1);
+      }
+      
+      setSelectedDate(availableDate);
+    } else if (therapists.length > 0) {
+      // Generate time blocks only when we have therapists data
+      generateTimeBlocks();
     }
-    
-    setSelectedDate(availableDate);
-  } else if (therapists.length > 0) {
-    // This is the existing generateTimeBlocks effect
-    generateTimeBlocks();
-  }
-}, [selectedDate, therapists, fromAppointments]);
+  }, [selectedDate, therapists, fromAppointments]);
 
 // Add this new useEffect to handle initial date selection
 useEffect(() => {
@@ -125,28 +125,36 @@ useEffect(() => {
   }, [navigate, fromAppointments]);
 
   useEffect(() => {
+    const controller = new AbortController();
+    const signal = controller.signal;
+    
+    const fetchTherapists = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await axios.get(`${ServerIP}/api/GetTherapistsTrimmed`, {
+          signal: signal
+        });
+        setTherapists(response.data);
+      } catch (error) {
+        if (!axios.isCancel(error)) {
+          console.error("Error fetching therapists:", error);
+          setError("Failed to load therapists. Please try again later.");
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+    
     fetchTherapists();
+    
+    // Cleanup function to abort any in-flight requests
+    return () => {
+      controller.abort();
+    };
   }, []);
 
-  useEffect(() => {
-    if (therapists.length > 0) {
-      generateTimeBlocks();
-    }
-  }, [selectedDate, therapists]);
-
-  const fetchTherapists = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await axios.get(`${ServerIP}/api/GetTherapists`);
-      setTherapists(response.data);
-    } catch (error) {
-      console.error("Error fetching therapists:", error);
-      setError("Failed to load therapists. Please try again later.");
-    } finally {
-      setLoading(false);
-    }
-  };
+ 
 
   const generateTimeBlocks = () => {
     const blocks = [];
@@ -346,7 +354,7 @@ useEffect(() => {
     value={selectedDate}
     onChange={handleDateChange}
     minDate={new Date()}
-    maxDate={addDays(new Date(), 30)}
+    maxDate={addDays(new Date(), 7)}
     shouldDisableDate={(date) => format(date, 'EEEE') === 'Friday'}
     sx={{ width: '100%', mb: 2 }}
     format="EEEE, MMMM d, yyyy"
@@ -365,49 +373,45 @@ useEffect(() => {
       }
     }}
   >
-    <Box sx={{ 
-      display: 'flex', 
-      justifyContent: 'flex-start', 
-      mt: 2,
-      minWidth: { xs: '500px', sm: 'auto' }
-    }}>
-      {(() => {
-        const buttons = [];
-        let currentDate = new Date();
-        let daysAdded = 0;
-        
-        while (buttons.length < 7) {
-          // Skip Fridays (5 is Friday in JavaScript's getDay(), where 0 is Sunday)
-          if (currentDate.getDay() !== 5) {
-            const date = new Date(currentDate);
-            buttons.push(
-              <Button
-                key={daysAdded}
-                variant={isEqual(date, selectedDate) ? "contained" : "outlined"}
-                onClick={() => handleDateChange(date)}
-                sx={{
-                  flex: { xs: '0 0 auto', sm: 1 },
-                  mx: 0.5,
-                  flexDirection: 'column',
-                  py: 1,
-                  minWidth: { xs: '64px', sm: '0' },
-                  px: { xs: 1, sm: 2 }
-                }}
-              >
-                <Typography variant="caption">{format(date, 'EEE')}</Typography>
-                <Typography>{format(date, 'd')}</Typography>
-              </Button>
-            );
-          }
-          
-          // Move to next day
-          currentDate = addDays(currentDate, 1);
-          daysAdded++;
-        }
-        
-        return buttons;
-      })()}
-    </Box>
+    <Box sx={{
+  display: 'flex',
+  justifyContent: 'flex-start',
+  mt: 2,
+  minWidth: { xs: '500px', sm: 'auto' },
+  overflowX: 'auto'  // Add scroll for small screens
+}}>
+  {(() => {
+    const buttons = [];
+    let currentDate = new Date();
+    // Show exactly 7 days
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(currentDate);
+      buttons.push(
+        <Button
+          key={i}
+          variant={isEqual(date, selectedDate) ? "contained" : "outlined"}
+          onClick={() => handleDateChange(date)}
+          disabled={currentDate.getDay() === 5}  // Disable Fridays instead of skipping
+          sx={{
+            flex: { xs: '0 0 auto', sm: 1 },
+            mx: 0.5,
+            flexDirection: 'column',
+            py: 1,
+            minWidth: { xs: '64px', sm: '0' },
+            px: { xs: 1, sm: 2 },
+            opacity: currentDate.getDay() === 5 ? 0.6 : 1  // Make Fridays appear faded
+          }}
+        >
+          <Typography variant="caption">{format(date, 'EEE')}</Typography>
+          <Typography>{format(date, 'd')}</Typography>
+        </Button>
+      );
+      // Move to next day
+      currentDate = addDays(currentDate, 1);
+    }
+    return buttons;
+  })()}
+</Box>
   </Box>
   
   <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, textAlign: 'center' }}>
@@ -842,7 +846,7 @@ useEffect(() => {
       )}
       
       {/* Main Container */}
-      <Container maxWidth="md" sx={{ my: 2 }}>
+      <Container maxWidth="md" disableGutters sx={{ my: 2 }}>
         {/* Show logo only on initial screen */}
         
         {/* Error message if present */}

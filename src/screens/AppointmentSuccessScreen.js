@@ -54,12 +54,12 @@ const AppointmentSuccessScreen = () => {
               display="flex"
               justifyContent="center"
               alignItems="center"
-              height={180}
+              height={200}
             >
               <Lottie
                 animationData={successAnimation}
                 loop={true}
-                style={{ width: 160, height: 160 }}
+                style={{ width: 180, height: 180 }}
               />
             </Box>
           </Box>

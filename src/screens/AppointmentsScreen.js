@@ -79,14 +79,50 @@ const AppointmentsScreen = () => {
   };
 
   const formatAppointmentDate = (dateTimeString) => {
-    const date = new Date(dateTimeString);
+    // Handle different date formats and ensure cross-platform compatibility
+    let date;
     
-    // Format the date as yyyy/mm/dd
+    // Try to parse the date in a cross-platform compatible way
+    if (dateTimeString.includes('/') && dateTimeString.includes('&')) {
+      // If it's already in our format, parse it carefully
+      const [datePart, timePart] = dateTimeString.split(' & ');
+      const [year, month, day] = datePart.split('/').map(Number);
+      const timeMatch = timePart.match(/(\d+):(\d+) ([AP]M)/);
+      
+      if (timeMatch) {
+        const [_, hours, minutes, ampm] = timeMatch;
+        let hour = parseInt(hours);
+        if (ampm === 'PM' && hour < 12) hour += 12;
+        if (ampm === 'AM' && hour === 12) hour = 0;
+        
+        date = new Date(year, month - 1, day, hour, parseInt(minutes));
+      } else {
+        // Fallback to current date if parsing fails
+        date = new Date();
+      }
+    } else {
+      // For ISO strings and other formats, try these methods
+      // First, try direct parsing
+      date = new Date(dateTimeString);
+      
+      // If that fails (results in Invalid Date), try alternative methods
+      if (isNaN(date.getTime())) {
+        // Try replacing any dashes with slashes for better iOS compatibility
+        date = new Date(dateTimeString.replace(/-/g, '/'));
+        
+        // If still invalid, use a fallback
+        if (isNaN(date.getTime())) {
+          console.error('Invalid date format:', dateTimeString);
+          return 'Invalid Date';
+        }
+      }
+    }
+    
+    // Now format the date consistently
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     
-    // Format the time as h:mm a (12-hour format with AM/PM)
     const hours = date.getHours();
     const minutes = String(date.getMinutes()).padStart(2, '0');
     const ampm = hours >= 12 ? 'PM' : 'AM';
@@ -309,14 +345,16 @@ const AppointmentsScreen = () => {
               >
                 Book a New Appointment
               </Button>
+              
             </Box>
           </Fade>
         )}
+        
       </Container>
       
       <Box sx={{ mt: 4 }}>
-        <ContactBox />
-      </Box>
+        <ContactBox/>
+        </Box>
     </Box>
   );
 };
