@@ -384,7 +384,7 @@ useEffect(() => {
     const buttons = [];
     let currentDate = new Date();
     // Show exactly 7 days
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < 8; i++) {
       const date = new Date(currentDate);
       buttons.push(
         <Button
